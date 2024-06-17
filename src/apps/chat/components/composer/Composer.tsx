@@ -457,23 +457,24 @@ export function Composer(props: {
       const selectedDirHandle = await (window as any).showDirectoryPicker();
       const files: File[] = [];
   
-      async function getFilesFromDirectory(dirHandle: any) {
+      async function getFilesFromDirectory(dirHandle: any, path: string) {
         for await (const [name, handle] of dirHandle.entries()) {
+          const fullPath = `${path}/${name}`;
           if (handle.kind === 'file') {
             const file = await handle.getFile();
-            files.push(file);
+            files.push({ file, path: fullPath });
           } else if (handle.kind === 'directory') {
-            await getFilesFromDirectory(handle);
+            await getFilesFromDirectory(handle, fullPath);
           }
         }
       }
   
-      await getFilesFromDirectory(selectedDirHandle);
+      await getFilesFromDirectory(selectedDirHandle, selectedDirHandle.name);
   
-      const contentParts: string[] = [];
-      let currentPart = '';
+      for (const { file, path } of files) {
+        // 3-second delay before processing each file
+        await new Promise(resolve => setTimeout(resolve, 3000));
   
-      for (const file of files) {
         let text = await file.text();
   
         // Trim lines and remove extra newlines
@@ -483,38 +484,42 @@ export function Composer(props: {
           .join('\n')
           .replace(/\n{2,}/g, '\n\n');
   
-        if (currentPart.length + text.length > 15000) {
-          contentParts.push(currentPart);
-          currentPart = '';
-        }
-        currentPart += text;
-      }
-      if (currentPart.length > 0) {
-        contentParts.push(currentPart);
-      }
+        const contentParts: string[] = [];
+        let currentPart = '';
   
-      let combinedContent = '';
-      contentParts.forEach((content, index) => {
-        const partNumber = index + 1;
-        const totalParts = contentParts.length;
-        const wrappedContent = `
-  Do not answer yet. In my project, this is content of file [filePath] . Just receive and acknowledge it
+        for (const line of text.split('\n')) {
+          if (currentPart.length + line.length + 1 > 15000) {
+            contentParts.push(currentPart);
+            currentPart = '';
+          }
+          currentPart += line + '\n';
+        }
+        if (currentPart.length > 0) {
+          contentParts.push(currentPart);
+        }
+  
+        for (const [index, content] of contentParts.entries()) {
+          const partNumber = index + 1;
+          const totalParts = contentParts.length;
+          const wrappedContent = `
+  Do not answer yet. In my project, this is content of file ${path} . Just receive and acknowledge it
   [START PART ${partNumber}/${totalParts}]
   ${content}
   [END PART ${partNumber}/${totalParts}]
   Remember not answering yet.`.trim();
   
-        combinedContent += wrappedContent + '\n';
-      });
-  
-      // Update the composeText state
-      setComposeText(combinedContent);
-  
+          // Wait for the state to update before triggering send
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Delay before sending the next part
+          handleSendAction(chatModeId, wrappedContent);
+          console.log(`Part ${partNumber} Sent for file ${path}`);
+        }
+      }
     } catch (error) {
       console.error('Error picking directory:', error);
     }
-  }, [setComposeText]);  
+  }, [chatModeId, handleSendAction]);
   
+
 
   useGlobalShortcut(supportsClipboardRead ? 'v' : false, true, true, false, attachAppendClipboardItems);
 
@@ -688,8 +693,8 @@ export function Composer(props: {
               {/* Responsive Open Files button */}
               <ButtonAttachFileMemo onAttachFilePicker={handleAttachFilePicker} />
 
-               {/* Responsive Open Folder button */}
-               <ButtonAttachFolderMemo onAttachFolderPicker={handleAttachFolderPicker} />
+              {/* Responsive Open Folder button */}
+              <ButtonAttachFolderMemo onAttachFolderPicker={handleAttachFolderPicker} />
 
               {/* Responsive Paste button */}
               {supportsClipboardRead && <ButtonAttachClipboardMemo onClick={attachAppendClipboardItems} />}
@@ -852,10 +857,10 @@ export function Composer(props: {
 
               {/* [mobile] bottom-corner secondary button */}
               {isMobile && (showChatExtras
-                  ? <ButtonCallMemo isMobile disabled={!props.conversationId || !chatLLMId} onClick={handleCallClicked} />
-                  : isDraw
-                    ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
-                    : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />
+                ? <ButtonCallMemo isMobile disabled={!props.conversationId || !chatLLMId} onClick={handleCallClicked} />
+                : isDraw
+                  ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
+                  : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />
               )}
 
               {/* Responsive Send/Stop buttons */}
