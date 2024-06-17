@@ -57,6 +57,7 @@ import type { ComposerOutputMultiPart } from './composer.types';
 import { ButtonAttachCameraMemo, useCameraCaptureModal } from './buttons/ButtonAttachCamera';
 import { ButtonAttachClipboardMemo } from './buttons/ButtonAttachClipboard';
 import { ButtonAttachFileMemo } from './buttons/ButtonAttachFile';
+import { ButtonAttachFolderMemo } from './buttons/ButtonAttachFolder';
 import { ButtonAttachScreenCaptureMemo } from './buttons/ButtonAttachScreenCapture';
 import { ButtonBeamMemo } from './buttons/ButtonBeam';
 import { ButtonCallMemo } from './buttons/ButtonCall';
@@ -451,6 +452,70 @@ export function Composer(props: {
     }
   }, [attachAppendFile]);
 
+  const handleAttachFolderPicker = React.useCallback(async () => {
+    try {
+      const selectedDirHandle = await (window as any).showDirectoryPicker();
+      const files: File[] = [];
+  
+      async function getFilesFromDirectory(dirHandle: any) {
+        for await (const [name, handle] of dirHandle.entries()) {
+          if (handle.kind === 'file') {
+            const file = await handle.getFile();
+            files.push(file);
+          } else if (handle.kind === 'directory') {
+            await getFilesFromDirectory(handle);
+          }
+        }
+      }
+  
+      await getFilesFromDirectory(selectedDirHandle);
+  
+      const contentParts: string[] = [];
+      let currentPart = '';
+  
+      for (const file of files) {
+        let text = await file.text();
+  
+        // Trim lines and remove extra newlines
+        text = text
+          .split('\n')
+          .map(line => line.trim())
+          .join('\n')
+          .replace(/\n{2,}/g, '\n\n');
+  
+        if (currentPart.length + text.length > 15000) {
+          contentParts.push(currentPart);
+          currentPart = '';
+        }
+        currentPart += text;
+      }
+      if (currentPart.length > 0) {
+        contentParts.push(currentPart);
+      }
+  
+      let combinedContent = '';
+      contentParts.forEach((content, index) => {
+        const partNumber = index + 1;
+        const totalParts = contentParts.length;
+        const wrappedContent = `
+  Do not answer yet. In my project, this is content of file [filePath] . Just receive and acknowledge it
+  [START PART ${partNumber}/${totalParts}]
+  ${content}
+  [END PART ${partNumber}/${totalParts}]
+  Remember not answering yet.`.trim();
+  
+        combinedContent += wrappedContent + '\n';
+      });
+  
+      // Update the composeText state
+      setComposeText(combinedContent);
+  
+    } catch (error) {
+      console.error('Error picking directory:', error);
+    }
+  }, [setComposeText]);  
+  
+
   useGlobalShortcut(supportsClipboardRead ? 'v' : false, true, true, false, attachAppendClipboardItems);
 
   const handleAttachmentInlineText = React.useCallback((attachmentId: AttachmentId) => {
@@ -599,6 +664,11 @@ export function Composer(props: {
                     <ButtonAttachFileMemo onAttachFilePicker={handleAttachFilePicker} />
                   </MenuItem>
 
+                  {/* Responsive Open Folder button */}
+                  <MenuItem>
+                    <ButtonAttachFolderMemo onAttachFolderPicker={handleAttachFolderPicker} />
+                  </MenuItem>
+
                   {/* Responsive Paste button */}
                   {supportsClipboardRead && <MenuItem>
                     <ButtonAttachClipboardMemo onClick={attachAppendClipboardItems} />
@@ -617,6 +687,9 @@ export function Composer(props: {
 
               {/* Responsive Open Files button */}
               <ButtonAttachFileMemo onAttachFilePicker={handleAttachFilePicker} />
+
+               {/* Responsive Open Folder button */}
+               <ButtonAttachFolderMemo onAttachFolderPicker={handleAttachFolderPicker} />
 
               {/* Responsive Paste button */}
               {supportsClipboardRead && <ButtonAttachClipboardMemo onClick={attachAppendClipboardItems} />}

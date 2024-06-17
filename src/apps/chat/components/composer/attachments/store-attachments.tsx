@@ -8,7 +8,7 @@ import { attachmentCreate, attachmentDefineConverters, attachmentLoadInputAsync,
 // Attachment Types
 
 export type AttachmentSourceOriginDTO = 'drop' | 'paste';
-export type AttachmentSourceOriginFile = 'camera' | 'screencapture' | 'file-open' | 'clipboard-read' | AttachmentSourceOriginDTO;
+export type AttachmentSourceOriginFile = 'camera' | 'screencapture' | 'file-open' | 'clipboard-read' | 'directory-open' | AttachmentSourceOriginDTO;
 
 export type AttachmentSource = {
   media: 'url';
