@@ -452,10 +452,16 @@ export function Composer(props: {
     }
   }, [attachAppendFile]);
 
+
+  type FileWithPath = {
+    file: File;
+    path: string;
+  };
+
   const handleAttachFolderPicker = React.useCallback(async () => {
     try {
       const selectedDirHandle = await (window as any).showDirectoryPicker();
-      const files: File[] = [];
+      const files: FileWithPath[] = [];
   
       async function getFilesFromDirectory(dirHandle: any, path: string) {
         for await (const [name, handle] of dirHandle.entries()) {
@@ -502,11 +508,11 @@ export function Composer(props: {
           const partNumber = index + 1;
           const totalParts = contentParts.length;
           const wrappedContent = `
-  Do not answer yet. In my project, this is content of file ${path} . Just receive and acknowledge it
-  [START PART ${partNumber}/${totalParts}]
-  ${content}
-  [END PART ${partNumber}/${totalParts}]
-  Remember not answering yet.`.trim();
+            Do not answer yet. In my project, this is content of file ${path}. Just receive and acknowledge it
+            [START PART ${partNumber}/${totalParts}]
+            ${content}
+            [END PART ${partNumber}/${totalParts}]
+            Remember not answering yet.`.trim();
   
           // Wait for the state to update before triggering send
           await new Promise(resolve => setTimeout(resolve, 2000)); // Delay before sending the next part
@@ -518,7 +524,6 @@ export function Composer(props: {
       console.error('Error picking directory:', error);
     }
   }, [chatModeId, handleSendAction]);
-  
 
 
   useGlobalShortcut(supportsClipboardRead ? 'v' : false, true, true, false, attachAppendClipboardItems);
